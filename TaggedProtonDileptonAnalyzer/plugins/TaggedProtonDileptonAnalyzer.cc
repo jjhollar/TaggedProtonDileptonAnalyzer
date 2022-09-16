@@ -125,7 +125,7 @@ private:
   Int_t TrackLiteRPID[100], TrackLiteArm[100];
 
   Double_t PrimVertexZ[100], PrimVertexY[100], PrimVertexX[100];
-  Int_t PrimVertexIsBS[100], PrimVertexNtracks[100];
+  Int_t PrimVertexIsBS[100], PrimVertexNtracks[100], PrimVertexNdof[100];
 
   Int_t nProtons;
   Float_t ProtonXi[100];
@@ -150,6 +150,7 @@ private:
   Float_t MuMuXi = 0;
   Float_t MuMuY = 0;
   Float_t MuMuM = 0;
+  Float_t MuMuAcop = 0;
 };
 
 //
@@ -228,7 +229,8 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
       PrimVertexY[i] = -999.;
       PrimVertexIsBS[i] = -999;
       PrimVertexNtracks[i] = -999;
-
+      PrimVertexNdof[i] = -999;
+      
       ProtonXi[i] = -999;
       ProtonThY[i] = -999;
       ProtonThX[i] = -999;
@@ -252,6 +254,7 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
     PrimVertexX[nVertices] = vtx.x();
     PrimVertexY[nVertices] = vtx.y();
     PrimVertexNtracks[nVertices] = vtx.nTracks(0);
+    PrimVertexNdof[nVertices] = vtx.ndof();
 
     if(vtx.isFake() == 1)
       PrimVertexIsBS[nVertices] = 1;
@@ -308,6 +311,17 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
       mumu = mup+mum;
       MuMuM = mumu.M();
       MuMuY = mumu.Rapidity();
+
+      if(MuMuY > 0)
+	MuMuXi = (1.0/13600.0)*((MuPlusPt*TMath::Exp(MuPlusEta)) + (MuMinusPt*TMath::Exp(MuMinusEta)));
+      if(MuMuY < 0)
+        MuMuXi = (1.0/13600.0)*((MuPlusPt*TMath::Exp(-1.0*MuPlusEta)) + (MuMinusPt*TMath::Exp(-1.0*MuMinusEta)));
+
+      float dphi = fabs(MuPlusPhi-MuMinusPhi);
+      if(dphi > 3.14159)
+	dphi = (2.0*3.14159) - dphi;
+      float acop = 1.0 - (dphi/3.14159);
+      MuMuAcop = acop;
 
     }
 
@@ -463,6 +477,7 @@ void TaggedProtonDileptonAnalyzer::beginJob() {
   tree->Branch("PrimVertexY", &PrimVertexY, "PrimVertexY[nVertices]/D");
   tree->Branch("PrimVertexNtracks", &PrimVertexNtracks, "PrimVertexNtracks[nVertices]/I");
   tree->Branch("PrimVertexIsBS", &PrimVertexIsBS, "PrimVertexIsBS[nVertices]/I");
+  tree->Branch("PrimVertexNdof", &PrimVertexNdof, "PrimVertexNdof[nVertices]/D");
 
   tree->Branch("nProtons", &nProtons, "nProtons/I");
   tree->Branch("ProtonXi", &ProtonXi, "ProtonXi[nProtons]/F");
@@ -476,6 +491,8 @@ void TaggedProtonDileptonAnalyzer::beginJob() {
 
   tree->Branch("MuMuM",&MuMuM, "MuMuM/F");
   tree->Branch("MuMuY",&MuMuY, "MuMuY/F");
+  tree->Branch("MuMuXi",&MuMuXi,"MuMuXi/F");
+  tree->Branch("MuMuAcop",&MuMuAcop,"MuMuAcop/F");
 
 }
 

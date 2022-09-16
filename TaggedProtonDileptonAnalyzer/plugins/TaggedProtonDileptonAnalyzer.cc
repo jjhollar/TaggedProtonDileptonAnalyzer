@@ -124,8 +124,8 @@ private:
   Float_t TrackLiteX[100], TrackLiteY[100], TrackLiteZ[100], TrackLiteTime[100], TrackLiteTimeUnc[100];
   Int_t TrackLiteRPID[100], TrackLiteArm[100];
 
-  Double_t PrimVertexZ[100], PrimVertexY[100], PrimVertexX[100];
-  Int_t PrimVertexIsBS[100], PrimVertexNtracks[100], PrimVertexNdof[100];
+  Double_t PrimVertexZ[100], PrimVertexY[100], PrimVertexX[100], PrimVertexNdof[100];
+  Int_t PrimVertexIsBS[100], PrimVertexNtracks[100];
 
   Int_t nProtons;
   Float_t ProtonXi[100];
@@ -229,7 +229,7 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
       PrimVertexY[i] = -999.;
       PrimVertexIsBS[i] = -999;
       PrimVertexNtracks[i] = -999;
-      PrimVertexNdof[i] = -999;
+      PrimVertexNdof[i] = -999.;
       
       ProtonXi[i] = -999;
       ProtonThY[i] = -999;

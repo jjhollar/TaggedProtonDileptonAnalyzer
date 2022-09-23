@@ -114,6 +114,8 @@ private:
 
   std::string lhcInfoLabel_;
 
+  std::string doLeptons_;
+
   // Tree contents                                                                                                                                                           
 
   // Run+event quantities                                                                                                                                                                   
@@ -193,10 +195,12 @@ TaggedProtonDileptonAnalyzer::TaggedProtonDileptonAnalyzer(const edm::ParameterS
     recoProtonsMultiRPToken_   ( consumes<std::vector<reco::ForwardProton> >      ( iConfig.getParameter<edm::InputTag>( "ppsRecoProtonMultiRPTag" ) ) ) {
 
   //now do what ever initialization is needed
+  doLeptons_ = iConfig.getUntrackedParameter<std::string>("doLeptons");
+
   outputFile_ = iConfig.getUntrackedParameter<std::string>("outfilename", "output.root");
   file = new TFile(outputFile_.c_str(), "recreate");
   file->cd();
-  // tree definition                                                                                                                                                         
+  // tree definition                                                                                                                                         
   tree = new TTree("ntp1", "ntp1");
 
 }
@@ -313,97 +317,102 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
   TLorentzVector mup, mum, mumu;
   TLorentzVector elep, elem, eleele;
 
-  /* Muons */
-  for( const auto& mu1 : *muons )
+  if(doLeptons_ == "Muons")
     {
-      if(mu1.pt() > 25 && mu1.charge()==1 && mu1.isTightMuon(vertices->at(0)))
+      /* Muons */
+      for( const auto& mu1 : *muons )
 	{
-	  if(mu1.pt() > MuPlusPt)
+	  if(mu1.pt() > 25 && mu1.charge()==1 && mu1.isTightMuon(vertices->at(0)))
 	    {
-	      MuPlusPt = mu1.pt();
-	      MuPlusEta = mu1.eta();
-              MuPlusPhi = mu1.phi();
-              MuPlusM = mu1.mass();
+	      if(mu1.pt() > MuPlusPt)
+		{
+		  MuPlusPt = mu1.pt();
+		  MuPlusEta = mu1.eta();
+		  MuPlusPhi = mu1.phi();
+		  MuPlusM = mu1.mass();
+		}
+	    }
+	  if(mu1.pt() > 25 && mu1.charge()==-1 && mu1.isTightMuon(vertices->at(0)))
+	    {
+	      if(mu1.pt() > MuMinusPt)
+		{
+		  MuMinusPt = mu1.pt();
+		  MuMinusEta = mu1.eta();
+		  MuMinusPhi = mu1.phi();
+		  MuMinusM = mu1.mass();
+		}
 	    }
 	}
-      if(mu1.pt() > 25 && mu1.charge()==-1 && mu1.isTightMuon(vertices->at(0)))
+      
+      if(MuPlusPt>0 && MuMinusPt>0)
 	{
-	  if(mu1.pt() > MuMinusPt)
-	    {
-	      MuMinusPt = mu1.pt();
-	      MuMinusEta = mu1.eta();
-	      MuMinusPhi = mu1.phi();
-	      MuMinusM = mu1.mass();
-	    }
+	  mup.SetPtEtaPhiM(MuPlusPt,MuPlusEta,MuPlusPhi,MuPlusM);
+	  mum.SetPtEtaPhiM(MuMinusPt,MuMinusEta,MuMinusPhi,MuMinusM);
+	  mumu = mup+mum;
+	  MuMuM = mumu.M();
+	  MuMuY = mumu.Rapidity();
+	  
+	  if(MuMuY > 0)
+	    MuMuXi = (1.0/13600.0)*((MuPlusPt*TMath::Exp(MuPlusEta)) + (MuMinusPt*TMath::Exp(MuMinusEta)));
+	  if(MuMuY < 0)
+	    MuMuXi = (1.0/13600.0)*((MuPlusPt*TMath::Exp(-1.0*MuPlusEta)) + (MuMinusPt*TMath::Exp(-1.0*MuMinusEta)));
+	  
+	  float dphi = fabs(MuPlusPhi-MuMinusPhi);
+	  if(dphi > 3.14159)
+	    dphi = (2.0*3.14159) - dphi;
+	  float acop = 1.0 - (dphi/3.14159);
+	  MuMuAcop = acop;
+	  
 	}
     }
-  
-  if(MuPlusPt>0 && MuMinusPt>0)
+
+  if(doLeptons_ == "Electrons")
     {
-      mup.SetPtEtaPhiM(MuPlusPt,MuPlusEta,MuPlusPhi,MuPlusM);
-      mum.SetPtEtaPhiM(MuMinusPt,MuMinusEta,MuMinusPhi,MuMinusM);
-      mumu = mup+mum;
-      MuMuM = mumu.M();
-      MuMuY = mumu.Rapidity();
-
-      if(MuMuY > 0)
-	MuMuXi = (1.0/13600.0)*((MuPlusPt*TMath::Exp(MuPlusEta)) + (MuMinusPt*TMath::Exp(MuMinusEta)));
-      if(MuMuY < 0)
-        MuMuXi = (1.0/13600.0)*((MuPlusPt*TMath::Exp(-1.0*MuPlusEta)) + (MuMinusPt*TMath::Exp(-1.0*MuMinusEta)));
-
-      float dphi = fabs(MuPlusPhi-MuMinusPhi);
-      if(dphi > 3.14159)
-	dphi = (2.0*3.14159) - dphi;
-      float acop = 1.0 - (dphi/3.14159);
-      MuMuAcop = acop;
-
+      /* Electrons */
+      for( const auto& ele1 : *electrons )
+	{
+	  if(ele1.pt() > 25 && ele1.charge()==1 && ele1.electronID("cutBasedElectronID-Fall17-94X-V2-medium")==true) // && ele1.isTightElectron(vertices->at(0)))
+	    {
+	      if(ele1.pt() > ElePlusPt)
+		{
+		  ElePlusPt = ele1.pt();
+		  ElePlusEta = ele1.eta();
+		  ElePlusPhi = ele1.phi();
+		  ElePlusM = ele1.mass();
+		}
+	    }
+	  if(ele1.pt() > 25 && ele1.charge()==-1 && ele1.electronID("cutBasedElectronID-Fall17-94X-V2-medium")==true) // && ele1.isTightElectron(vertices->at(0)))
+	    {
+	      if(ele1.pt() > EleMinusPt)
+		{
+		  EleMinusPt = ele1.pt();
+		  EleMinusEta = ele1.eta();
+		  EleMinusPhi = ele1.phi();
+		  EleMinusM = ele1.mass();
+		}
+	    }
+	}
+      
+      if(ElePlusPt>0 && EleMinusPt>0)
+	{
+	  elep.SetPtEtaPhiM(ElePlusPt,ElePlusEta,ElePlusPhi,ElePlusM);
+	  elem.SetPtEtaPhiM(EleMinusPt,EleMinusEta,EleMinusPhi,EleMinusM);
+	  eleele = elep+elem;
+	  EleEleM = eleele.M();
+	  EleEleY = eleele.Rapidity();
+	  
+	  if(EleEleY > 0)
+	    EleEleXi = (1.0/13600.0)*((ElePlusPt*TMath::Exp(ElePlusEta)) + (EleMinusPt*TMath::Exp(EleMinusEta)));
+	  if(EleEleY < 0)
+	    EleEleXi = (1.0/13600.0)*((ElePlusPt*TMath::Exp(-1.0*ElePlusEta)) + (EleMinusPt*TMath::Exp(-1.0*EleMinusEta)));
+	  
+	  float dphi = fabs(ElePlusPhi-EleMinusPhi);
+	  if(dphi > 3.14159)
+	    dphi = (2.0*3.14159) - dphi;
+	  float acop = 1.0 - (dphi/3.14159);
+	  EleEleAcop = acop;
+	}
     }
-
-  /* Electrons */
-  for( const auto& ele1 : *electrons )
-    {
-      if(ele1.pt() > 25 && ele1.charge()==1 && ele1.electronID("cutBasedElectronID-Fall17-94X-V2-medium")==true) // && ele1.isTightElectron(vertices->at(0)))
-        {
-          if(ele1.pt() > ElePlusPt)
-            {
-              ElePlusPt = ele1.pt();
-              ElePlusEta = ele1.eta();
-              ElePlusPhi = ele1.phi();
-              ElePlusM = ele1.mass();
-            }
-        }
-      if(ele1.pt() > 25 && ele1.charge()==-1 && ele1.electronID("cutBasedElectronID-Fall17-94X-V2-medium")==true) // && ele1.isTightElectron(vertices->at(0)))
-        {
-          if(ele1.pt() > EleMinusPt)
-            {
-              EleMinusPt = ele1.pt();
-              EleMinusEta = ele1.eta();
-              EleMinusPhi = ele1.phi();
-              EleMinusM = ele1.mass();
-            }
-        }
-    }
-
-  if(ElePlusPt>0 && EleMinusPt>0)
-    {
-      elep.SetPtEtaPhiM(ElePlusPt,ElePlusEta,ElePlusPhi,ElePlusM);
-      elem.SetPtEtaPhiM(EleMinusPt,EleMinusEta,EleMinusPhi,EleMinusM);
-      eleele = elep+elem;
-      EleEleM = eleele.M();
-      EleEleY = eleele.Rapidity();
-
-      if(EleEleY > 0)
-        EleEleXi = (1.0/13600.0)*((ElePlusPt*TMath::Exp(ElePlusEta)) + (EleMinusPt*TMath::Exp(EleMinusEta)));
-      if(EleEleY < 0)
-        EleEleXi = (1.0/13600.0)*((ElePlusPt*TMath::Exp(-1.0*ElePlusEta)) + (EleMinusPt*TMath::Exp(-1.0*EleMinusEta)));
-
-      float dphi = fabs(ElePlusPhi-EleMinusPhi);
-      if(dphi > 3.14159)
-        dphi = (2.0*3.14159) - dphi;
-      float acop = 1.0 - (dphi/3.14159);
-      EleEleAcop = acop;
-    }
-
 
 
   /* Proton lite tracks */

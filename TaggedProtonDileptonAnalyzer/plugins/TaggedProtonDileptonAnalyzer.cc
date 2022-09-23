@@ -39,6 +39,7 @@
 #include "DataFormats/BeamSpot/interface/BeamSpot.h"
 #include "DataFormats/VertexReco/interface/Vertex.h"
 #include "DataFormats/PatCandidates/interface/Muon.h"
+#include "DataFormats/PatCandidates/interface/Electron.h"
 #include "DataFormats/PatCandidates/interface/Vertexing.h"
 
 // RP                                                                                                                                                                                        
@@ -104,6 +105,7 @@ private:
 
   edm::EDGetTokenT< edm::View<reco::Vertex> > verticesToken_;
   edm::EDGetTokenT< edm::View<pat::Muon> > muonsToken_;
+  edm::EDGetTokenT< edm::View<pat::Electron> > electronsToken_;
 
   edm::EDGetTokenT<std::vector<reco::ForwardProton> > recoProtonsSingleRPToken_;
   edm::EDGetTokenT<std::vector<reco::ForwardProton> > recoProtonsMultiRPToken_;
@@ -151,6 +153,22 @@ private:
   Float_t MuMuY = 0;
   Float_t MuMuM = 0;
   Float_t MuMuAcop = 0;
+
+  Int_t nElectrons = 0;
+  Float_t ElePlusPt = 0;
+  Float_t EleMinusPt = 0;
+  Float_t ElePlusEta = 0;
+  Float_t EleMinusEta = 0;
+  Float_t ElePlusPhi = 0;
+  Float_t EleMinusPhi = 0;
+  Float_t ElePlusM = 0;
+  Float_t EleMinusM = 0;
+
+  Float_t EleEleXi = 0;
+  Float_t EleEleY = 0;
+  Float_t EleEleM = 0;
+  Float_t EleEleAcop = 0;
+
 };
 
 //
@@ -170,6 +188,7 @@ TaggedProtonDileptonAnalyzer::TaggedProtonDileptonAnalyzer(const edm::ParameterS
   : pps_tracklite_token_ ( consumes<std::vector<CTPPSLocalTrackLite>>(iConfig.getParameter<edm::InputTag>("tagTrackLites") ) ),
     verticesToken_    ( consumes< edm::View<reco::Vertex> >( iConfig.getParameter<edm::InputTag>( "verticesTag" ) ) ),
     muonsToken_    ( consumes< edm::View<pat::Muon> >( iConfig.getParameter<edm::InputTag>( "muonsTag" ) ) ),
+    electronsToken_ ( consumes< edm::View<pat::Electron> >( iConfig.getParameter<edm::InputTag>( "electronsTag" ) ) ),
     recoProtonsSingleRPToken_   ( consumes<std::vector<reco::ForwardProton> >      ( iConfig.getParameter<edm::InputTag>( "ppsRecoProtonSingleRPTag" ) ) ),
     recoProtonsMultiRPToken_   ( consumes<std::vector<reco::ForwardProton> >      ( iConfig.getParameter<edm::InputTag>( "ppsRecoProtonMultiRPTag" ) ) ) {
 
@@ -205,7 +224,8 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
   edm::Handle< edm::View<pat::Muon> > muons;
   iEvent.getByToken( muonsToken_, muons );
 
-
+  edm::Handle< edm::View<pat::Electron> > electrons;
+  iEvent.getByToken( electronsToken_, electrons );
 
   // Run and BX information                                                                                                                          
   BX = iEvent.bunchCrossing();
@@ -277,7 +297,21 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
   MuMuY = 0;
   MuMuM = 0;
 
+  ElePlusPt = 0;
+  EleMinusPt = 0;
+  ElePlusEta = 0;
+  EleMinusEta = 0;
+  ElePlusPhi = 0;
+  EleMinusPhi = 0;
+  ElePlusM = 0;
+  EleMinusM = 0;
+
+  EleEleXi = 0;
+  EleEleY = 0;
+  EleEleM = 0;
+
   TLorentzVector mup, mum, mumu;
+  TLorentzVector elep, elem, eleele;
 
   /* Muons */
   for( const auto& mu1 : *muons )
@@ -324,6 +358,53 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
       MuMuAcop = acop;
 
     }
+
+  /* Electrons */
+  for( const auto& ele1 : *electrons )
+    {
+      if(ele1.pt() > 25 && ele1.charge()==1 && ele1.electronID("cutBasedElectronID-Fall17-94X-V2-medium")==true) // && ele1.isTightElectron(vertices->at(0)))
+        {
+          if(ele1.pt() > ElePlusPt)
+            {
+              ElePlusPt = ele1.pt();
+              ElePlusEta = ele1.eta();
+              ElePlusPhi = ele1.phi();
+              ElePlusM = ele1.mass();
+            }
+        }
+      if(ele1.pt() > 25 && ele1.charge()==-1 && ele1.electronID("cutBasedElectronID-Fall17-94X-V2-medium")==true) // && ele1.isTightElectron(vertices->at(0)))
+        {
+          if(ele1.pt() > EleMinusPt)
+            {
+              EleMinusPt = ele1.pt();
+              EleMinusEta = ele1.eta();
+              EleMinusPhi = ele1.phi();
+              EleMinusM = ele1.mass();
+            }
+        }
+    }
+
+  if(ElePlusPt>0 && EleMinusPt>0)
+    {
+      elep.SetPtEtaPhiM(ElePlusPt,ElePlusEta,ElePlusPhi,ElePlusM);
+      elem.SetPtEtaPhiM(EleMinusPt,EleMinusEta,EleMinusPhi,EleMinusM);
+      eleele = elep+elem;
+      EleEleM = eleele.M();
+      EleEleY = eleele.Rapidity();
+
+      if(EleEleY > 0)
+        EleEleXi = (1.0/13600.0)*((ElePlusPt*TMath::Exp(ElePlusEta)) + (EleMinusPt*TMath::Exp(EleMinusEta)));
+      if(EleEleY < 0)
+        EleEleXi = (1.0/13600.0)*((ElePlusPt*TMath::Exp(-1.0*ElePlusEta)) + (EleMinusPt*TMath::Exp(-1.0*EleMinusEta)));
+
+      float dphi = fabs(ElePlusPhi-EleMinusPhi);
+      if(dphi > 3.14159)
+        dphi = (2.0*3.14159) - dphi;
+      float acop = 1.0 - (dphi/3.14159);
+      EleEleAcop = acop;
+    }
+
+
 
   /* Proton lite tracks */
   edm::Handle<std::vector<CTPPSLocalTrackLite> > ppsTracksLite;
@@ -448,7 +529,7 @@ void TaggedProtonDileptonAnalyzer::analyze(const edm::Event& iEvent, const edm::
         }
     }
 
-  if(MuMuM > 0)
+  if((MuMuM > 0) || (EleEleM > 0))
     tree->Fill();
 }
 
@@ -493,6 +574,11 @@ void TaggedProtonDileptonAnalyzer::beginJob() {
   tree->Branch("MuMuY",&MuMuY, "MuMuY/F");
   tree->Branch("MuMuXi",&MuMuXi,"MuMuXi/F");
   tree->Branch("MuMuAcop",&MuMuAcop,"MuMuAcop/F");
+
+  tree->Branch("EleEleM",&EleEleM, "EleEleM/F");
+  tree->Branch("EleEleY",&EleEleY, "EleEleY/F");
+  tree->Branch("EleEleXi",&EleEleXi,"EleEleXi/F");
+  tree->Branch("EleEleAcop",&EleEleAcop,"EleEleAcop/F");
 
 }
 
